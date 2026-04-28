@@ -1,0 +1,324 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Footprints, 
+  Droplets, 
+  Moon, 
+  Flame, 
+  Plus, 
+  Minus, 
+  Trophy, 
+  History, 
+  Settings,
+  Activity,
+  Heart,
+  TrendingUp,
+  Smartphone,
+  CheckCircle2,
+  AlertCircle,
+  Save
+} from 'lucide-react';
+
+const App = () => {
+  // --- Local Storage Initialization ---
+  const getInitialData = (key, defaultValue) => {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  };
+
+  // --- State Management ---
+  const [steps, setSteps] = useState(() => getInitialData('steps', 0));
+  const [water, setWater] = useState(() => getInitialData('water', 0));
+  const [sleep, setSleep] = useState(() => getInitialData('sleep', 0));
+  const [goal, setGoal] = useState(() => getInitialData('goal', 10000));
+  const [history, setHistory] = useState(() => getInitialData('history', []));
+  const [isWalking, setIsWalking] = useState(false);
+  
+  const [isConnected, setIsConnected] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('idle');
+
+  // --- Persistence Hooks ---
+  useEffect(() => {
+    localStorage.setItem('steps', JSON.stringify(steps));
+    localStorage.setItem('water', JSON.stringify(water));
+    localStorage.setItem('sleep', JSON.stringify(sleep));
+    localStorage.setItem('history', JSON.stringify(history));
+    localStorage.setItem('goal', JSON.stringify(goal));
+  }, [steps, water, sleep, history, goal]);
+
+  // --- Derived Calculations ---
+  const stepProgress = useMemo(() => Math.min((steps / goal) * 100, 100), [steps, goal]);
+  const estimatedCalories = useMemo(() => (steps * 0.04).toFixed(1), [steps]);
+  const estimatedDistance = useMemo(() => (steps * 0.00076).toFixed(2), [steps]);
+
+  // --- Google Fit Integration Simulation ---
+  const connectGoogleFit = async () => {
+    setSyncStatus('syncing');
+    try {
+      // In production: use google.accounts.id.initialize and gapi.client.fitness
+      setTimeout(() => {
+        setIsConnected(true);
+        setSyncStatus('success');
+        setSteps(prev => prev + 1500); // Simulate fetching steps
+      }, 2000);
+    } catch (error) {
+      setSyncStatus('error');
+    }
+  };
+
+  // --- Step Tracking Logic ---
+  useEffect(() => {
+    let interval;
+    if (isWalking) {
+      interval = setInterval(() => {
+        setSteps(prev => prev + Math.floor(Math.random() * 3) + 1);
+      }, 500);
+    }
+    return () => clearInterval(interval);
+  }, [isWalking]);
+
+  // Handle Real Motion Sensor
+  useEffect(() => {
+    const handleMotion = (event) => {
+      const acc = event.accelerationIncludingGravity;
+      if (!acc || isConnected) return;
+      const threshold = 12;
+      const magnitude = Math.sqrt(acc.x ** 2 + acc.y ** 2 + acc.z ** 2);
+      if (magnitude > threshold) {
+        setSteps(prev => prev + 1);
+      }
+    };
+    
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        // Request for iOS 13+ is usually triggered by user interaction (button)
+    } else {
+        window.addEventListener('devicemotion', handleMotion);
+    }
+    return () => window.removeEventListener('devicemotion', handleMotion);
+  }, [isConnected]);
+
+  const saveTodayData = () => {
+    const today = new Date().toLocaleDateString('th-TH');
+    const newData = { 
+        id: Date.now(), 
+        date: today, 
+        steps, 
+        water, 
+        sleep, 
+        calories: parseFloat(estimatedCalories) 
+    };
+    setHistory([newData, ...history.slice(0, 9)]);
+    
+    // Reset daily values
+    setSteps(0);
+    setWater(0);
+    setSleep(0);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-24 font-sans text-slate-900 select-none">
+      {/* Header */}
+      <header className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white p-6 rounded-b-[2.5rem] shadow-xl">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <p className="text-indigo-100 text-xs font-medium uppercase tracking-widest">ยินดีต้อนรับกลับมา</p>
+            <h1 className="text-2xl font-bold italic">Healthy Life</h1>
+          </div>
+          <div className={`p-2.5 rounded-2xl transition-all duration-500 ${isConnected ? 'bg-green-400 shadow-green-400/50' : 'bg-white/10'}`}>
+            <Heart className={`w-6 h-6 ${isConnected ? 'text-white' : 'text-indigo-200'} animate-pulse`} />
+          </div>
+        </div>
+
+        {/* Integration Notification */}
+        {!isConnected && (
+            <div className="mb-6 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
+                <div className="flex items-center gap-3 text-sm">
+                    <div className="bg-white/20 p-2 rounded-xl">
+                        <Smartphone size={18} />
+                    </div>
+                    <span>เชื่อมต่อ Google Fit</span>
+                </div>
+                <button 
+                    onClick={connectGoogleFit}
+                    className="bg-white text-indigo-600 text-xs font-bold px-4 py-2 rounded-xl shadow-sm active:scale-95 transition-transform"
+                >
+                    {syncStatus === 'syncing' ? 'กำลังเชื่อม...' : 'เริ่มใช้งาน'}
+                </button>
+            </div>
+        )}
+
+        {/* Main Step Counter Card */}
+        <div className="bg-white text-slate-900 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden transition-all active:scale-[0.98]">
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2 text-indigo-600 font-bold uppercase text-xs tracking-tighter">
+                    <Footprints className="w-4 h-4" />
+                    <span>จำนวนก้าวเดิน</span>
+                </div>
+                {isConnected && (
+                    <span className="flex items-center gap-1 text-[10px] bg-green-50 text-green-600 px-3 py-1 rounded-full font-bold border border-green-100">
+                        <CheckCircle2 size={10} /> ซิงค์ข้อมูลแล้ว
+                    </span>
+                )}
+            </div>
+            
+            <div className="flex items-baseline gap-2 mb-4">
+              <span className="text-6xl font-black text-slate-800 tracking-tighter">{steps.toLocaleString()}</span>
+              <span className="text-slate-400 font-bold text-sm">/ {goal.toLocaleString()}</span>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden mb-6 shadow-inner">
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-1000 ease-out"
+                style={{ width: `${stepProgress}%` }}
+              ></div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t border-slate-50 pt-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-50 p-2 rounded-lg text-orange-500">
+                    <Flame size={20} />
+                </div>
+                <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">แคลอรี่</p>
+                    <p className="font-extrabold text-lg">{estimatedCalories}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 border-l border-slate-50 pl-4">
+                <div className="bg-blue-50 p-2 rounded-lg text-blue-500">
+                    <TrendingUp size={20} />
+                </div>
+                <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">ระยะทาง</p>
+                    <p className="font-extrabold text-lg">{estimatedDistance} <span className="text-xs font-medium">กม.</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Background Decorative Element */}
+          <div className="absolute -right-16 -bottom-16 w-56 h-56 bg-indigo-50/50 rounded-full z-0"></div>
+        </div>
+      </header>
+
+      <main className="p-5 space-y-6">
+        {/* Quick Actions */}
+        <section>
+            <div className="flex items-center justify-between mb-3 px-1">
+                <h2 className="font-bold text-slate-400 text-xs uppercase tracking-widest">การควบคุม</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                <button 
+                    onClick={() => setIsWalking(!isWalking)}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold whitespace-nowrap shadow-sm transition-all active:scale-95 ${
+                    isWalking ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                    }`}
+                >
+                    <Activity size={18} />
+                    {isWalking ? 'หยุดจำลอง' : 'ลองจำลองเดิน'}
+                </button>
+                <button 
+                    onClick={saveTodayData}
+                    className="flex items-center gap-2 px-6 py-3 bg-slate-800 text-white rounded-2xl font-bold whitespace-nowrap shadow-lg active:scale-95 transition-all"
+                >
+                    <Save size={18} />
+                    บันทึกข้อมูลวันนี้
+                </button>
+            </div>
+        </section>
+
+        {/* Stats Grid */}
+        <section className="grid grid-cols-2 gap-4">
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group">
+            <div className="bg-blue-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
+              <Droplets className="text-blue-500 w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-slate-800">ดื่มน้ำ</h3>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-3xl font-black text-slate-800">{water} <span className="text-xs font-bold text-slate-300">แก้ว</span></span>
+              <div className="flex flex-col gap-1.5">
+                <button onClick={() => setWater(w => w + 1)} className="p-1.5 bg-blue-50 rounded-xl text-blue-600 hover:bg-blue-100 active:scale-90"><Plus size={14} /></button>
+                <button onClick={() => setWater(w => Math.max(0, w - 1))} className="p-1.5 bg-slate-50 rounded-xl text-slate-400 hover:bg-slate-100 active:scale-90"><Minus size={14} /></button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden group">
+            <div className="bg-purple-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
+              <Moon className="text-purple-500 w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-slate-800">การนอน</h3>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-3xl font-black text-slate-800">{sleep} <span className="text-xs font-bold text-slate-300">ชม.</span></span>
+              <div className="flex flex-col gap-1.5">
+                <button onClick={() => setSleep(s => s + 0.5)} className="p-1.5 bg-purple-50 rounded-xl text-purple-600 hover:bg-purple-100 active:scale-90"><Plus size={14} /></button>
+                <button onClick={() => setSleep(s => Math.max(0, s - 0.5))} className="p-1.5 bg-slate-50 rounded-xl text-slate-400 hover:bg-slate-100 active:scale-90"><Minus size={14} /></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* History Section */}
+        <section className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-black text-xl flex items-center gap-2 text-slate-800 italic">
+              History
+            </h3>
+            <div className="bg-indigo-50 p-2 rounded-xl text-indigo-500">
+                <History size={18} />
+            </div>
+          </div>
+          
+          {history.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 opacity-30">
+              <Activity size={48} className="mb-2" />
+              <p className="text-sm font-bold uppercase tracking-widest">No Data Yet</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {history.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-3xl border border-white hover:border-indigo-100 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="w-1.5 h-8 bg-indigo-500 rounded-full"></div>
+                    <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase">{item.date}</p>
+                        <p className="text-sm font-black text-slate-700">{item.steps.toLocaleString()} ก้าว</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-indigo-600">{((item.steps / goal) * 100).toFixed(0)}%</p>
+                    <div className="flex gap-1 justify-end opacity-50">
+                        <Droplets size={10} />
+                        <Moon size={10} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+
+      {/* Modern Bottom Navigation */}
+      <nav className="fixed bottom-6 left-6 right-6 h-20 bg-slate-900/90 backdrop-blur-xl rounded-[2.5rem] shadow-2xl flex justify-around items-center px-4 z-50 border border-white/10">
+        <button className="p-3 text-indigo-400 relative">
+          <Activity size={24} />
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-indigo-400 rounded-full"></div>
+        </button>
+        <button className="p-3 text-slate-500 hover:text-slate-300">
+          <Trophy size={24} />
+        </button>
+        <button className="bg-indigo-600 text-white p-4 rounded-full -mt-16 shadow-2xl shadow-indigo-500/50 border-[6px] border-slate-50 active:scale-90 transition-all">
+          <Plus size={24} strokeWidth={3} />
+        </button>
+        <button className="p-3 text-slate-500 hover:text-slate-300">
+          <TrendingUp size={24} />
+        </button>
+        <button className="p-3 text-slate-500 hover:text-slate-300">
+          <Settings size={24} />
+        </button>
+      </nav>
+    </div>
+  );
+};
+
+export default App;
